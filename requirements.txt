@@ -1,2 +1,1 @@
-pandas
-streamlit-google-oauth
+streamlit-google-auth

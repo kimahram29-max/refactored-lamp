@@ -2,45 +2,87 @@ import streamlit as st
 import datetime
 import pandas as pd
 
-# --- 페이지 설정 (가장 먼저 실행되어야 함) ---
+# --- 페이지 설정 ---
 st.set_page_config(
     page_title="AI-Assisted LMS Prototype", 
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# --- 커스텀 CSS 스타일링 (더 밝고 친근한 폰트 및 레이아웃) ---
+# --- 다크/라이트 모드 통합 방어 커스텀 CSS ---
 st.markdown("""
     <style>
-        /* 전체 배경 및 폰트 스타일 */
+        /* 기본 메인 배경 톤 조정 */
         .main {
-            background-color: #FAFAFA;
+            background-color: #F8FAFC;
         }
-        h1 {
-            color: #1E3A8A;
+        
+        /* 타이틀 색상 강조 */
+        .main-title {
+            color: #1E3A8A !important;
             font-family: 'Malgun Gothic', sans-serif;
             font-weight: 800;
+            margin-bottom: 5px;
         }
-        h2, h3 {
-            color: #2563EB;
-            font-family: 'Malgun Gothic', sans-serif;
+        
+        /* 서브타이틀 색상 고정 (다크모드 대응) */
+        .sub-title {
+            color: #475569 !important;
+            font-size: 16px;
+            margin-bottom: 25px;
         }
-        /* 카드 형태의 흰색 배경 박스 */
+        
+        /* [핵심 수정] 카드 형태의 박스 내부 글자색을 명시적으로 고정 */
         .custom-card {
-            background-color: #FFFFFF;
+            background-color: #FFFFFF !important;
             padding: 25px;
             border-radius: 16px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            margin-bottom: 20px;
-            border-left: 5px solid #3B82F6;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            margin-bottom: 25px;
+            border-left: 6px solid #3B82F6;
         }
+        
+        /* 카드 내부의 모든 텍스트 색상을 어두운 톤으로 강제 고정 */
+        .custom-card h4 {
+            color: #1E293B !important;
+            font-weight: bold;
+            margin-top: 0;
+            margin-bottom: 10px;
+        }
+        .custom-card p {
+            color: #64748B !important;
+            font-size: 14px;
+            margin-bottom: 0;
+        }
+        
         /* 게시판 글 카드 스타일 */
         .board-card {
-            background-color: #FFFFFF;
+            background-color: #FFFFFF !important;
             padding: 20px;
             border-radius: 12px;
-            border: 1px solid #E5E7EB;
+            border: 1px solid #E2E8F0;
             margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+        .board-user {
+            color: #1E293B !important;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        .board-sentence {
+            margin-top: 10px; 
+            font-size: 15px; 
+            background-color: #F8FAFC !important; 
+            color: #334155 !important;
+            padding: 12px; 
+            border-radius: 8px;
+            border-left: 3px solid #CBD5E1;
+        }
+        .board-feedback {
+            color: #2563EB !important; 
+            font-size: 14px; 
+            margin-bottom: 0;
+            font-weight: 500;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -67,9 +109,9 @@ def generate_educational_feedback(sentence):
         return "✍️ 'I think'는 훌륭한 표현이에요! 만약 조금 더 격식 있고 명확한 주장을 펼치고 싶다면 'I believe'나 'I contend' 같은 멋진 어휘로 업그레이드해 보는 걸 추천해요! 🚀", "어휘 확장 제안"
     return "🎉 와우! 문법과 표현이 아주 매끄럽고 훌륭한 문장이에요. 작성한 문장을 소리 내어 크게 3번 읽어보며 귀로 직접 확인해 보세요! 🗣️⭐", "정상 문장"
 
-# --- 사이드바 디자인 (역할 분류) ---
+# --- 사이드바 디자인 ---
 with st.sidebar:
-    st.markdown("<h1 style='text-align: center; font-size: 24px;'>🎈 서비스 모드</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; font-size: 24px; color: #F1F5F9;'>🎈 서비스 모드</h1>", unsafe_allow_html=True)
     st.write("---")
     user_role = st.radio(
         "당신의 역할을 선택해 주세요:", 
@@ -77,12 +119,11 @@ with st.sidebar:
         index=0
     )
     st.write("---")
-    st.markdown("<small style='color:gray;'>EduTech LMS Prototype v1.2</small>", unsafe_allow_html=True)
+    st.markdown("<small style='color:#94A3B8;'>EduTech LMS Prototype v1.3</small>", unsafe_allow_html=True)
 
-# --- 메인 타이틀 ---
-st.markdown("# 🚀 스마트 AI 영어 글쓰기 놀이터")
-st.markdown("##### AI의 다정함 피드백을 받고, 친구들과 공유하며 데이터로 성장하는 우리들만의 대시보드 📝🌱")
-st.markdown("---")
+# --- 메인 헤더 ---
+st.markdown("<h1 class='main-title'>🚀 스마트 AI 영어 글쓰기 놀이터</h1>", unsafe_allow_html=True)
+st.markdown("<p class='sub-title'>AI의 다정한 피드백을 받고, 친구들과 공유하며 데이터로 성장하는 우리들만의 대시보드 📝🌱</p>", unsafe_allow_html=True)
 
 # ==================== [학생 모드] ====================
 if "학생" in user_role:
@@ -91,14 +132,14 @@ if "학생" in user_role:
     tab1, tab2 = st.tabs(["✨ AI랑 문장 연습하기", "👭 친구들 생각 훔쳐보기 (게시판)"])
     
     with tab1:
+        # 내부에 명시적인 글자색을 갖춘 카드 컴포넌트
         st.markdown("""
             <div class='custom-card'>
                 <h4>📝 오늘 연습할 문장을 작성해 보아요!</h4>
-                <p style='color: gray; font-size: 14px;'>문장을 작성하면 AI 튜터가 스스로 정답을 찾을 수 있도록 다정한 힌트(비계 설정)를 제공합니다.</p>
+                <p>문장을 작성하면 AI 튜터가 스스로 정답을 찾을 수 있도록 다정한 힌트(비계 설정)를 제공합니다.</p>
             </div>
         """, unsafe_allow_html=True)
         
-        # 이름과 입력창을 더 깔끔하게 배치
         col_name, col_input = st.columns([1, 3])
         with col_name:
             student_name = st.text_input("닉네임", value="영어꿈나무")
@@ -113,7 +154,6 @@ if "학생" in user_role:
                     st.session_state.current_feedback = feedback
                     st.session_state.current_error_type = error_type
                     
-                    # 로그 기록
                     log_entry = {
                         "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
                         "student_id": student_name,
@@ -124,10 +164,8 @@ if "학생" in user_role:
                 else:
                     st.error("⚠️ 문장을 먼저 입력해야 AI 튜터가 도와줄 수 있어요!")
                     
-        # 피드백이 있을 때 화사한 상자로 시각화
         if "current_feedback" in st.session_state and user_input:
             st.markdown("#### 🤖 AI 튜터의 다정한 힌트")
-            # 정상 문장일 때는 초록색 상자, 오류 힌트일 때는 파란색 상자
             if "🎉" in st.session_state.current_feedback:
                 st.success(st.session_state.current_feedback)
             else:
@@ -157,10 +195,9 @@ if "학생" in user_role:
             for post in st.session_state.board_data:
                 st.markdown(f"""
                     <div class='board-card'>
-                        <span style='font-size: 18px; font-weight: bold;'>👤 {post['user']}</span> 
-                        <span style='color: gray; font-size: 12px; float: right;'>{post['date']}</span>
-                        <p style='margin-top: 10px; font-size: 16px; background-color: #F3F4F6; padding: 10px; border-radius: 6px;'>✍️ <b>작성 문장:</b> {post['sentence']}</p>
-                        <p style='color: #1E40AF; font-size: 14px; margin-bottom: 0;'>💡 <b>받은 AI 피드백:</b> {post['feedback']}</p>
+                        <div class='board-user'>👤 {post['user']} <span style='color: #94A3B8; font-size: 12px; font-weight: normal; float: right;'>{post['date']}</span></div>
+                        <div class='board-sentence'><b>✍️ 작성 문장:</b> {post['sentence']}</div>
+                        <div class='board-feedback'><b>💡 받은 AI 피드백:</b> {post['feedback']}</div>
                     </div>
                 """, unsafe_allow_html=True)
 
@@ -175,7 +212,6 @@ else:
     else:
         df = pd.DataFrame(st.session_state.user_logs)
         
-        # 지표 카드를 더 예쁘고 눈에 띄게 배치
         m_col1, m_col2 = st.columns(2)
         with m_col1:
             st.markdown("""
@@ -196,9 +232,7 @@ else:
         st.write("")
         st.write("")
         
-        # 레이아웃을 쪼개서 왼쪽은 로그 표, 오른쪽은 시각화 그래프 배치
         g_col1, g_col2 = st.columns([3, 2])
-        
         with g_col1:
             st.markdown("##### 🕒 실시간 학습 활동 로그 (LRS 데이터 수집)")
             st.dataframe(df, use_container_width=True, hide_index=True)

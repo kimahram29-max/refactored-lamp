@@ -3,6 +3,8 @@ import datetime
 import pandas as pd
 import random
 import string
+import json
+import os
 from streamlit_google_auth import Authenticate
 
 # --- 페이지 설정 ---
@@ -84,34 +86,32 @@ def generate_educational_feedback(sentence):
     return "🎉 와우! 문법과 표현이 아주 매끄럽고 훌륭한 문장이에요. 작성한 문장을 소리 내어 크게 3번 읽어보며 귀로 직접 확인해 보세요! 🗣️⭐", "정상 문장"
 
 # ==========================================
-# 🔒 [구글 계정 연동] 유연한 파라미터 언패킹 처리
+# 🔒 [구글 계정 연동] 자격증명 임시 파일 강제 생성 방식
 # ==========================================
-# 두 가지 패키지 버전 형태의 키 값을 모두 준비하여 딕셔너리로 결합
-auth_kwargs = {
-    "cookie_name": "lms_oauth_cookie",
-    "cookie_key": st.secrets["google_auth"]["cookie_secret"],
-    "cookie_expiry_days": 1,
-    "client_id": st.secrets["google_auth"]["client_id"],
-    "client_secret": st.secrets["google_auth"]["client_secret"],
-    "redirect_uri": st.secrets["google_auth"]["redirect_uri"]
+JSON_FILE_PATH = "google_credentials_temp.json"
+
+# 표준 클라이언트 ID 구조에 맞추어 딕셔너리 생성
+google_creds_dict = {
+    "web": {
+        "client_id": st.secrets["google_auth"]["client_id"],
+        "client_secret": st.secrets["google_auth"]["client_secret"],
+        "redirect_uris": [st.secrets["google_auth"]["redirect_uri"]],
+        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+        "token_uri": "https://oauth2.googleapis.com/token"
+    }
 }
 
-# 인자명을 하드코딩하지 않고 언패킹 기법(**)으로 안전하게 주입
-try:
-    authenticator = Authenticate(**auth_kwargs)
-except TypeError:
-    # 만약 특정 버전에서 client_id를 직접 받지 못하고 다른 구조를 원할 때의 백업 루틴
-    auth_kwargs_backup = {
-        "secret_credentials_path": {
-            "client_id": st.secrets["google_auth"]["client_id"],
-            "client_secret": st.secrets["google_auth"]["client_secret"],
-            "redirect_uri": st.secrets["google_auth"]["redirect_uri"]
-        },
-        "cookie_name": "lms_oauth_cookie",
-        "cookie_key": st.secrets["google_auth"]["cookie_secret"],
-        "cookie_expiry_days": 1
-    }
-    authenticator = Authenticate(**auth_kwargs_backup)
+# 런타임에 JSON 자격증명 파일 물리적 생성
+with open(JSON_FILE_PATH, "w", encoding="utf-8") as f:
+    json.dump(google_creds_dict, f, ensure_ascii=False, indent=4)
+
+# 가장 검증된 순수 정석 파라미터 조합으로 초기화
+authenticator = Authenticate(
+    secret_credentials_path=JSON_FILE_PATH,
+    cookie_name="lms_oauth_cookie",
+    cookie_key=st.secrets["google_auth"]["cookie_secret"],
+    cookie_expiry_days=1
+)
 
 # 로그인 상태 체크
 authenticator.check_authentification()

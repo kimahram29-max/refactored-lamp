@@ -40,7 +40,7 @@ st.markdown("""
 # --- 데이터베이스 대용 세션 상태 초기화 ---
 if "classes" not in st.session_state:
     st.session_state.classes = {
-        "ENG-A班": {
+        "ENG-A반": {
             "name": "초급 영어 회화반", 
             "teacher_email": "teacher@gmail.com", 
             "teacher_name": "선생님",
@@ -52,7 +52,7 @@ if "classes" not in st.session_state:
 if "board_data" not in st.session_state:
     st.session_state.board_data = [
         {
-            "class": "ENG-A班", 
+            "class": "ENG-A반", 
             "board_name": "📝 1주차 시제 연습 동네",
             "user_email": "student1@gmail.com",
             "user_name": "홍길동", 
@@ -64,7 +64,7 @@ if "board_data" not in st.session_state:
 
 if "user_logs" not in st.session_state:
     st.session_state.user_logs = [
-        {"timestamp": "2026-06-12 14:19", "class_code": "ENG-A班", "board_name": "📝 1주차 시제 연습 동네", "student_email": "student1@gmail.com", "sentence": "I active study English yesterday.", "error_type": "동사 시제 오류"}
+        {"timestamp": "2026-06-12 14:19", "class_code": "ENG-A반", "board_name": "📝 1주차 시제 연습 동네", "student_email": "student1@gmail.com", "sentence": "I active study English yesterday.", "error_type": "동사 시제 오류"}
     ]
 
 if "my_classes" not in st.session_state:
@@ -81,24 +81,24 @@ def generate_educational_feedback(sentence):
         return "💡 과거의 특별한 순간('yesterday')을 이야기하고 있네요! 동사의 형태도 과거형으로 맞춰주면 어떨까요? 바꾸어 다시 입력해 보세요! ✨", "동사 시제 오류"
     if "i think" in sentence_lower:
         return "✍️ 'I think'는 훌륭한 표현이에요! 만약 조금 더 격식 있고 명확한 주장을 펼치고 싶다면 'I believe'나 'I contend' 같은 멋진 어휘로 업그레이드해 보는 걸 추천해요! 🚀", "어휘 확장 제안"
-    return "🎉 와우! 문법 and 표현이 아주 매끄럽고 훌륭한 문장이에요. 작성한 문장을 소리 내어 크게 3번 읽어보며 귀로 직접 확인해 보세요! 🗣️⭐", "정상 문장"
+    return "🎉 와우! 문법과 표현이 아주 매끄럽고 훌륭한 문장이에요. 작성한 문장을 소리 내어 크게 3번 읽어보며 귀로 직접 확인해 보세요! 🗣️⭐", "정상 문장"
 
 # ==========================================
-# 🔒 [구글 계정 연동] 세션 기반 로그인 인증 관리
+# 🔒 [구글 계정 연동] 인자 오류 수정한 보안 구역
 # ==========================================
+# 에러가 발생하던 인자 생성을 생략하고, Secrets에서 값을 직접 대입하는 방식으로 우회
 authenticator = Authenticate(
-    secret_credentials_path=None, # 파일 대신 st.secrets를 직접 주입받아 처리
     cookie_name="lms_oauth_cookie",
     cookie_key=st.secrets["google_auth"]["cookie_secret"],
     cookie_expiry_days=1
 )
 
-# 내부 정보 수동 오버라이딩 (secrets 연동 보장)
+# Secrets 매핑 데이터를 안전하게 세팅
 authenticator.client_id = st.secrets["google_auth"]["client_id"]
 authenticator.client_secret = st.secrets["google_auth"]["client_secret"]
 authenticator.redirect_uri = st.secrets["google_auth"]["redirect_uri"]
 
-# 로그인 체크 및 컴포넌트 렌더링
+# 로그인 상태 확인 구동
 authenticator.check_authentification()
 
 if not st.session_state.get("connected", False):
@@ -109,12 +109,11 @@ if not st.session_state.get("connected", False):
         </div>
     """, unsafe_allow_html=True)
     
-    # 안전한 소셜 로그인 연결 단추 생성
     authenticator.login()
     st.stop()
 
 else:
-    # 로그인 검증 완료 시 고유 이메일 및 유저 닉네임 파싱
+    # 로그인 성공 시 유저 정보 할당
     user_email = st.session_state.get("user_info", {}).get("email", "unknown@gmail.com")
     user_name = st.session_state.get("user_info", {}).get("name", "사용자")
     
@@ -167,7 +166,7 @@ else:
             st.rerun()
             
         st.write("---")
-        st.markdown("<small style='color:#94A3B8;'>EduTech LMS v2.1</small>", unsafe_allow_html=True)
+        st.markdown("<small style='color:#94A3B8;'>EduTech LMS v2.2</small>", unsafe_allow_html=True)
 
     st.markdown("<h1 class='main-title'>🚀 스마트 AI 영어 글쓰기 놀이터</h1>", unsafe_allow_html=True)
     st.markdown("<p class='sub-title'>구글 인증을 통해 동명이인 걱정 없이 안전하게 빌드업하는 포트폴리오 대시보드 📝🌱</p>", unsafe_allow_html=True)

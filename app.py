@@ -84,22 +84,34 @@ def generate_educational_feedback(sentence):
     return "🎉 와우! 문법과 표현이 아주 매끄럽고 훌륭한 문장이에요. 작성한 문장을 소리 내어 크게 3번 읽어보며 귀로 직접 확인해 보세요! 🗣️⭐", "정상 문장"
 
 # ==========================================
-# 🔒 [구글 계정 연동] 딕셔너리 직접 매핑으로 인자 오류 완전 차단
+# 🔒 [구글 계정 연동] 유연한 파라미터 언패킹 처리
 # ==========================================
-# secrets 딕셔너리에서 필요한 정보만 구성하여 복사
-auth_config = {
+# 두 가지 패키지 버전 형태의 키 값을 모두 준비하여 딕셔너리로 결합
+auth_kwargs = {
+    "cookie_name": "lms_oauth_cookie",
+    "cookie_key": st.secrets["google_auth"]["cookie_secret"],
+    "cookie_expiry_days": 1,
     "client_id": st.secrets["google_auth"]["client_id"],
     "client_secret": st.secrets["google_auth"]["client_secret"],
     "redirect_uri": st.secrets["google_auth"]["redirect_uri"]
 }
 
-# 개별 인자 충돌을 방지하기 위해 dict 패킹 방식으로 초기화 우회 진입
-authenticator = Authenticate(
-    secret_credentials_path=auth_config,  # 일부 버전은 여기에 딕셔너리를 직접 받음
-    cookie_name="lms_oauth_cookie",
-    cookie_key=st.secrets["google_auth"]["cookie_secret"],
-    cookie_expiry_days=1
-)
+# 인자명을 하드코딩하지 않고 언패킹 기법(**)으로 안전하게 주입
+try:
+    authenticator = Authenticate(**auth_kwargs)
+except TypeError:
+    # 만약 특정 버전에서 client_id를 직접 받지 못하고 다른 구조를 원할 때의 백업 루틴
+    auth_kwargs_backup = {
+        "secret_credentials_path": {
+            "client_id": st.secrets["google_auth"]["client_id"],
+            "client_secret": st.secrets["google_auth"]["client_secret"],
+            "redirect_uri": st.secrets["google_auth"]["redirect_uri"]
+        },
+        "cookie_name": "lms_oauth_cookie",
+        "cookie_key": st.secrets["google_auth"]["cookie_secret"],
+        "cookie_expiry_days": 1
+    }
+    authenticator = Authenticate(**auth_kwargs_backup)
 
 # 로그인 상태 체크
 authenticator.check_authentification()
@@ -169,7 +181,7 @@ else:
             st.rerun()
             
         st.write("---")
-        st.markdown("<small style='color:#94A3B8;'>EduTech LMS v2.4</small>", unsafe_allow_html=True)
+        st.markdown("<small style='color:#94A3B8;'>EduTech LMS v2.5</small>", unsafe_allow_html=True)
 
     st.markdown("<h1 class='main-title'>🚀 스마트 AI 영어 글쓰기 놀이터</h1>", unsafe_allow_html=True)
     st.markdown("<p class='sub-title'>구글 인증을 통해 동명이인 걱정 없이 안전하게 빌드업하는 포트폴리오 대시보드 📝🌱</p>", unsafe_allow_html=True)

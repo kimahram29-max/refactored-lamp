@@ -3,7 +3,7 @@ import datetime
 import pandas as pd
 import random
 import string
-from streamlit_google_oauth import login_with_google
+from streamlit_google_auth import Authenticate
 
 # --- 페이지 설정 ---
 st.set_page_config(
@@ -40,11 +40,11 @@ st.markdown("""
 # --- 데이터베이스 대용 세션 상태 초기화 ---
 if "classes" not in st.session_state:
     st.session_state.classes = {
-        "ENG-A반": {
+        "ENG-A班": {
             "name": "초급 영어 회화반", 
             "teacher_email": "teacher@gmail.com", 
-            "teacher_name": "김아람 선생님",
-            "students": ["student1@gmail.com"], # 이제 이메일(고유 ID)로 관리합니다.
+            "teacher_name": "선생님",
+            "students": ["student1@gmail.com"],
             "boards": ["📢 공지사항 및 자유게시판", "📝 1주차 시제 연습 동네"]
         }
     }
@@ -52,7 +52,7 @@ if "classes" not in st.session_state:
 if "board_data" not in st.session_state:
     st.session_state.board_data = [
         {
-            "class": "ENG-A반", 
+            "class": "ENG-A班", 
             "board_name": "📝 1주차 시제 연습 동네",
             "user_email": "student1@gmail.com",
             "user_name": "홍길동", 
@@ -71,10 +71,8 @@ if "my_classes" not in st.session_state:
     st.session_state.my_classes = ["ENG-A반"]
 
 if "user_role_dict" not in st.session_state:
-    # 프로토타입의 편의성을 위해 이메일별 역할을 기억하는 딕셔너리
     st.session_state.user_role_dict = {}
 
-# 교육공학적 AI 피드백 규칙 함수
 def generate_educational_feedback(sentence):
     sentence_lower = sentence.lower().strip()
     if len(sentence.split()) < 3:
@@ -83,41 +81,49 @@ def generate_educational_feedback(sentence):
         return "💡 과거의 특별한 순간('yesterday')을 이야기하고 있네요! 동사의 형태도 과거형으로 맞춰주면 어떨까요? 바꾸어 다시 입력해 보세요! ✨", "동사 시제 오류"
     if "i think" in sentence_lower:
         return "✍️ 'I think'는 훌륭한 표현이에요! 만약 조금 더 격식 있고 명확한 주장을 펼치고 싶다면 'I believe'나 'I contend' 같은 멋진 어휘로 업그레이드해 보는 걸 추천해요! 🚀", "어휘 확장 제안"
-    return "🎉 와우! 문법과 표현이 아주 매끄럽고 훌륭한 문장이에요. 작성한 문장을 소리 내어 크게 3번 읽어보며 귀로 직접 확인해 보세요! 🗣️⭐", "정상 문장"
-
+    return "🎉 와우! 문법 and 표현이 아주 매끄럽고 훌륭한 문장이에요. 작성한 문장을 소리 내어 크게 3번 읽어보며 귀로 직접 확인해 보세요! 🗣️⭐", "정상 문장"
 
 # ==========================================
-# 🔒 [구글 계정 연동] 로그인 제어 구역
+# 🔒 [구글 계정 연동] 세션 기반 로그인 인증 관리
 # ==========================================
-# secrets 설정 기반으로 구글 로그인 컴포넌트 호출
-user_info = login_with_google(
-    client_id=st.secrets["google_auth"]["client_id"],
-    client_secret=st.secrets["google_auth"]["client_secret"],
-    redirect_uri=st.secrets["google_auth"]["redirect_uri"],
-    cookie_secret=st.secrets["google_auth"]["cookie_secret"]
+authenticator = Authenticate(
+    secret_credentials_path=None, # 파일 대신 st.secrets를 직접 주입받아 처리
+    cookie_name="lms_oauth_cookie",
+    cookie_key=st.secrets["google_auth"]["cookie_secret"],
+    cookie_expiry_days=1
 )
 
-if not user_info:
-    # 구글 로그인이 완료되지 않은 상태
+# 내부 정보 수동 오버라이딩 (secrets 연동 보장)
+authenticator.client_id = st.secrets["google_auth"]["client_id"]
+authenticator.client_secret = st.secrets["google_auth"]["client_secret"]
+authenticator.redirect_uri = st.secrets["google_auth"]["redirect_uri"]
+
+# 로그인 체크 및 컴포넌트 렌더링
+authenticator.check_authentification()
+
+if not st.session_state.get("connected", False):
     st.markdown("""
         <div class='login-container'>
             <h2>🎓 스마트 AI LMS 로그인</h2>
             <p>안전한 데이터 보호를 위해 구글 계정 연동이 필요합니다.<br>아래 버튼을 눌러 본인 인증을 진행해 주세요.</p>
         </div>
     """, unsafe_allow_html=True)
-    st.stop() # 로그인이 안 되어 있으면 이하 코드 실행을 완전히 차단
+    
+    # 안전한 소셜 로그인 연결 단추 생성
+    authenticator.login()
+    st.stop()
 
 else:
-    # 구글 로그인 성공 시 고유 이메일 및 사용자 이름 추출
-    user_email = user_info.get("email")
-    user_name = user_info.get("name", "사용자")
+    # 로그인 검증 완료 시 고유 이메일 및 유저 닉네임 파싱
+    user_email = st.session_state.get("user_info", {}).get("email", "unknown@gmail.com")
+    user_name = st.session_state.get("user_info", {}).get("name", "사용자")
     
-    # 해당 이메일의 역할(교사/학생)이 세션에 없다면 초기 선택 화면 제공
+    # 역할 부여 로직
     if user_email not in st.session_state.user_role_dict:
         st.markdown(f"""
             <div class='login-container'>
                 <h2>🌱 역할 등록 안내</h2>
-                <p><b>{user_name} ({user_email})</b>님, 반갑습니다!<br>이 계정으로 사용할 시스템 역할을 처음 한 번만 선택해 주세요.</p>
+                <p><b>{user_name} ({user_email})</b>님, 반갑습니다!<br>이 계정으로 사용할 시스템 역할을 선택해 주세요.</p>
             </div>
         """, unsafe_allow_html=True)
         
@@ -133,17 +139,14 @@ else:
     current_role = st.session_state.user_role_dict[user_email]
 
     # ==========================================
-    # 🔓 본인 인증 완료 및 역할 매핑 완료 시 메인 대시보드 진입
+    # 🔓 메인 대시보드 애플리케이션 진입
     # ==========================================
-    
-    # 📱 [사이드바 제어 구역]
     with st.sidebar:
         st.markdown(f"<h3 style='text-align: center; color:#F1F5F9;'>👤 {user_name}님</h3>", unsafe_allow_html=True)
         st.markdown(f"<p style='text-align: center;' class='user-profile'>{user_email}</p>", unsafe_allow_html=True)
         st.info(f"현재 권한: {current_role}")
         st.write("---")
         
-        # [학생 모드 전용] 클래스 가입 컴포넌트
         if "학생" in current_role:
             st.markdown("### 🔑 클래스 코드 등록")
             join_code = st.text_input("선생님께 받은 코드 입력:", placeholder="예: ENG-W72B", key="join_class_input").strip()
@@ -159,10 +162,13 @@ else:
                     st.error("⚠️ 존재하지 않는 클래스 코드입니다.")
             st.write("---")
             
+        if st.button("🚪 로그아웃", use_container_width=True):
+            authenticator.logout()
+            st.rerun()
+            
         st.write("---")
-        st.markdown("<small style='color:#94A3B8;'>EduTech LMS v2.0 (Google OAuth)</small>", unsafe_allow_html=True)
+        st.markdown("<small style='color:#94A3B8;'>EduTech LMS v2.1</small>", unsafe_allow_html=True)
 
-    # 대시보드 메인 본문
     st.markdown("<h1 class='main-title'>🚀 스마트 AI 영어 글쓰기 놀이터</h1>", unsafe_allow_html=True)
     st.markdown("<p class='sub-title'>구글 인증을 통해 동명이인 걱정 없이 안전하게 빌드업하는 포트폴리오 대시보드 📝🌱</p>", unsafe_allow_html=True)
     st.markdown("---")

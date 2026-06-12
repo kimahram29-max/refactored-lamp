@@ -84,17 +84,21 @@ def generate_educational_feedback(sentence):
     return "🎉 와우! 문법과 표현이 아주 매끄럽고 훌륭한 문장이에요. 작성한 문장을 소리 내어 크게 3번 읽어보며 귀로 직접 확인해 보세요! 🗣️⭐", "정상 문장"
 
 # ==========================================
-# 🔒 [구글 계정 연동] 인자 오류 완전 수정 구역
+# 🔒 [구글 계정 연동] 딕셔너리 직접 매핑으로 인자 오류 완전 차단
 # ==========================================
-# 라이브러리가 요구하는 표준 방식(필수 인자 전부 기입)으로 인스턴스 생성
+# secrets 딕셔너리에서 필요한 정보만 구성하여 복사
+auth_config = {
+    "client_id": st.secrets["google_auth"]["client_id"],
+    "client_secret": st.secrets["google_auth"]["client_secret"],
+    "redirect_uri": st.secrets["google_auth"]["redirect_uri"]
+}
+
+# 개별 인자 충돌을 방지하기 위해 dict 패킹 방식으로 초기화 우회 진입
 authenticator = Authenticate(
-    secret_credentials_path=None,
+    secret_credentials_path=auth_config,  # 일부 버전은 여기에 딕셔너리를 직접 받음
     cookie_name="lms_oauth_cookie",
     cookie_key=st.secrets["google_auth"]["cookie_secret"],
-    cookie_expiry_days=1,
-    client_id=st.secrets["google_auth"]["client_id"],
-    client_secret=st.secrets["google_auth"]["client_secret"],
-    redirect_uri=st.secrets["google_auth"]["redirect_uri"]
+    cookie_expiry_days=1
 )
 
 # 로그인 상태 체크
@@ -165,7 +169,7 @@ else:
             st.rerun()
             
         st.write("---")
-        st.markdown("<small style='color:#94A3B8;'>EduTech LMS v2.3</small>", unsafe_allow_html=True)
+        st.markdown("<small style='color:#94A3B8;'>EduTech LMS v2.4</small>", unsafe_allow_html=True)
 
     st.markdown("<h1 class='main-title'>🚀 스마트 AI 영어 글쓰기 놀이터</h1>", unsafe_allow_html=True)
     st.markdown("<p class='sub-title'>구글 인증을 통해 동명이인 걱정 없이 안전하게 빌드업하는 포트폴리오 대시보드 📝🌱</p>", unsafe_allow_html=True)

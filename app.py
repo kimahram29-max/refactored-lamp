@@ -25,7 +25,9 @@ st.markdown("""
         .board-user { color: #1E293B !important; font-size: 16px; font-weight: bold; }
         .board-sentence { margin-top: 10px; font-size: 15px; background-color: #F8FAFC !important; color: #334155 !important; padding: 12px; border-radius: 8px; border-left: 3px solid #CBD5E1; }
         .board-feedback { color: #2563EB !important; font-size: 14px; margin-bottom: 0; font-weight: 500; }
-        .login-box { max-width: 450px; margin: 80px auto; padding: 40px; background-color: white; border-radius: 16px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+        .login-container { max-width: 450px; margin: 60px auto; padding: 35px; background-color: #FFFFFF !important; border-radius: 16px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border: 1px solid #E2E8F0; }
+        .login-container h2 { color: #1E3A8A !important; }
+        .login-container p { color: #64748B !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -58,12 +60,15 @@ def generate_educational_feedback(sentence):
 
 # --- [로그인 화면 로직] ---
 if not st.session_state.login_success:
-    st.markdown("<div class='login-box'>", unsafe_allow_html=True)
-    st.markdown("<h2 style='text-align: center; color: #1E3A8A; margin-top:0;'>🎓 유사 LMS 로그인</h2>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: gray; font-size:14px;'>테스트용 이름과 역할을 선택하고 입장하세요.</p>", unsafe_allow_html=True)
-    st.write("---")
+    # 빈 박스 레이아웃 버그를 완벽히 격리한 깔끔한 로그인 창
+    st.markdown("""
+        <div class='login-container'>
+            <h2 style='text-align: center; margin-top:0;'>🎓 유사 LMS 로그인</h2>
+            <p style='text-align: center; font-size:14px;'>테스트용 이름과 역할을 선택하고 입장하세요.</p>
+        </div>
+    """, unsafe_allow_html=True)
     
-    # 중복 에러 방지를 위해 고유한 key 값 설정
+    # 입력 컴포넌트 배치
     input_name = st.text_input("사용자 이름(이름 또는 닉네임):", value="영어꿈나무", key="login_name_input")
     input_role = st.selectbox("당신의 역할을 선택하세요:", ["선택하세요", "🌱 학생 (Learner)", "💼 교사 (Instructor)"], key="login_role_select")
     
@@ -75,9 +80,8 @@ if not st.session_state.login_success:
             st.session_state.login_success = True
             st.session_state.user_name = input_name
             st.session_state.user_role = input_role
+            st.success("로그인 성공!")
             st.rerun()
-            
-    st.markdown("</div>", unsafe_allow_html=True)
 
 # --- [로그인 성공 후 메인 화면] ---
 else:
@@ -115,7 +119,6 @@ else:
                 </div>
             """, unsafe_allow_html=True)
             
-            # 메인 작업창의 입력 칸 key 값 분리
             user_input = st.text_input("영어 문장 입력", placeholder="여기에 영어 문장을 적고 엔터를 누르거나 아래 버튼을 클릭하세요!", key="main_english_input")
             
             btn_col1, btn_col2 = st.columns([1, 2])
@@ -168,47 +171,4 @@ else:
                     st.markdown(f"""
                         <div class='board-card'>
                             <div class='board-user'>👤 {post['user']} <span style='color: #94A3B8; font-size: 12px; font-weight: normal; float: right;'>{post['date']}</span></div>
-                            <div class='board-sentence'><b>✍️ 작성 문장:</b> {post['sentence']}</div>
-                            <div class='board-feedback'><b>💡 받은 AI 피드백:</b> {post['feedback']}</div>
-                        </div>
-                    """, unsafe_allow_html=True)
-
-    # ==================== [교사 화면 분기] ====================
-    else:
-        st.markdown("### 📊 선생님 전용 관리자 대시보드")
-        st.write("학생들이 활동하며 남긴 학습 기록 데이터(LRS)를 실시간으로 분석하여 오프라인 수업 설계를 돕습니다.")
-        st.markdown("---")
-        
-        if not st.session_state.user_logs:
-            st.warning("아직 수집된 학생들의 학습 데이터가 존재하지 않습니다.")
-        else:
-            df = pd.DataFrame(st.session_state.user_logs)
-            
-            m_col1, m_col2 = st.columns(2)
-            with m_col1:
-                st.markdown(f"""
-                    <div style='background-color: #EFF6FF; padding: 20px; border-radius: 12px; text-align: center; border: 1px solid #BFDBFE;'>
-                        <p style='color: #1D4ED8; margin: 0; font-size: 16px; font-weight: bold;'>📈 총 누적 학습 문장 수</p>
-                        <h2 style='color: #1E40AF; margin: 10px 0 0 0;'>{len(df)}건</h2>
-                    </div>
-                """, unsafe_allow_html=True)
-            with m_col2:
-                most_common_error = df["error_type"].mode()[0] if not df.empty else "없음"
-                st.markdown(f"""
-                    <div style='background-color: #FEF2F2; padding: 20px; border-radius: 12px; text-align: center; border: 1px solid #FCA5A5;'>
-                        <p style='color: #991B1B; margin: 0; font-size: 16px; font-weight: bold;'>🔍 가장 빈번한 오류 유형</p>
-                        <h2 style='color: #7F1D1D; margin: 10px 0 0 0;'>{most_common_error}</h2>
-                    </div>
-                """, unsafe_allow_html=True)
-                
-            st.write("")
-            
-            g_col1, g_col2 = st.columns([3, 2])
-            with g_col1:
-                st.markdown("##### 🕒 실시간 학습 활동 로그 (LRS 데이터 수집)")
-                st.dataframe(df, use_container_width=True, hide_index=True)
-                
-            with g_col2:
-                st.markdown("##### 📊 주요 오류 유형 발생 분포")
-                error_counts = df["error_type"].value_counts()
-                st.bar_chart(error_counts, color="#3B82F6")
+                            <div class='board-sentence'><b>✍️ 작성 문장:</b> {post

@@ -3,10 +3,11 @@ import datetime
 import pandas as pd
 import random
 import string
+from streamlit_google_oauth import login_with_google
 
 # --- 페이지 설정 ---
 st.set_page_config(
-    page_title="AI-Assisted LMS Prototype", 
+    page_title="AI-Assisted LMS Prototype (Secure Auth)", 
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -27,22 +28,23 @@ st.markdown("""
         .board-user { color: #1E293B !important; font-size: 16px; font-weight: bold; }
         .board-sentence { margin-top: 10px; font-size: 15px; background-color: #F8FAFC !important; color: #334155 !important; padding: 12px; border-radius: 8px; border-left: 3px solid #CBD5E1; }
         .board-feedback { color: #2563EB !important; font-size: 14px; margin-bottom: 0; font-weight: 500; }
-        .login-container { max-width: 450px; margin: 60px auto; padding: 35px; background-color: #FFFFFF !important; border-radius: 16px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border: 1px solid #E2E8F0; }
-        .login-container h2 { color: #1E3A8A !important; text-align: center; margin-top:0; }
-        .login-container p { color: #64748B !important; text-align: center; font-size:14px; }
+        .login-container { max-width: 450px; margin: 60px auto; padding: 35px; background-color: #FFFFFF !important; border-radius: 16px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border: 1px solid #E2E8F0; text-align: center; }
+        .login-container h2 { color: #1E3A8A !important; margin-top:0; }
+        .login-container p { color: #64748B !important; font-size:14px; margin-bottom: 25px; }
         .class-box { background-color: #EFF6FF !important; padding: 15px; border-radius: 8px; border: 1px solid #BFDBFE; margin-bottom: 10px; }
         .board-tag { background-color: #E0F2FE !important; color: #0369A1 !important; padding: 3px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+        .user-profile { font-size: 13px; color: #64748B; }
     </style>
 """, unsafe_allow_html=True)
 
 # --- 데이터베이스 대용 세션 상태 초기화 ---
 if "classes" not in st.session_state:
-    # 기본 생성된 클래스 데이터 및 내부 게시판 목록
     st.session_state.classes = {
-        "ENG-A班": {
+        "ENG-A반": {
             "name": "초급 영어 회화반", 
-            "teacher": "선생님", 
-            "students": ["학생_홍길동", "영어꿈나무"],
+            "teacher_email": "teacher@gmail.com", 
+            "teacher_name": "김아람 선생님",
+            "students": ["student1@gmail.com"], # 이제 이메일(고유 ID)로 관리합니다.
             "boards": ["📢 공지사항 및 자유게시판", "📝 1주차 시제 연습 동네"]
         }
     }
@@ -50,9 +52,10 @@ if "classes" not in st.session_state:
 if "board_data" not in st.session_state:
     st.session_state.board_data = [
         {
-            "class": "ENG-A班", 
+            "class": "ENG-A반", 
             "board_name": "📝 1주차 시제 연습 동네",
-            "user": "학생_홍길동", 
+            "user_email": "student1@gmail.com",
+            "user_name": "홍길동", 
             "sentence": "I active study English yesterday.", 
             "feedback": "⚠️ 시제 오류 발견! 'yesterday'가 있으니 과거형 동사를 사용해 보세요.", 
             "date": "2026-06-12 14:20"
@@ -61,17 +64,15 @@ if "board_data" not in st.session_state:
 
 if "user_logs" not in st.session_state:
     st.session_state.user_logs = [
-        {"timestamp": "2026-06-12 14:19", "class_code": "ENG-A班", "board_name": "📝 1주차 시제 연습 동네", "student_id": "학생_홍길동", "sentence": "I active study English yesterday.", "error_type": "동사 시제 오류"}
+        {"timestamp": "2026-06-12 14:19", "class_code": "ENG-A班", "board_name": "📝 1주차 시제 연습 동네", "student_email": "student1@gmail.com", "sentence": "I active study English yesterday.", "error_type": "동사 시제 오류"}
     ]
 
-if "login_success" not in st.session_state:
-    st.session_state.login_success = False
-if "user_name" not in st.session_state:
-    st.session_state.user_name = ""
-if "user_role" not in st.session_state:
-    st.session_state.user_role = ""
 if "my_classes" not in st.session_state:
-    st.session_state.my_classes = ["ENG-A班"]
+    st.session_state.my_classes = ["ENG-A반"]
+
+if "user_role_dict" not in st.session_state:
+    # 프로토타입의 편의성을 위해 이메일별 역할을 기억하는 딕셔너리
+    st.session_state.user_role_dict = {}
 
 # 교육공학적 AI 피드백 규칙 함수
 def generate_educational_feedback(sentence):
@@ -84,42 +85,72 @@ def generate_educational_feedback(sentence):
         return "✍️ 'I think'는 훌륭한 표현이에요! 만약 조금 더 격식 있고 명확한 주장을 펼치고 싶다면 'I believe'나 'I contend' 같은 멋진 어휘로 업그레이드해 보는 걸 추천해요! 🚀", "어휘 확장 제안"
     return "🎉 와우! 문법과 표현이 아주 매끄럽고 훌륭한 문장이에요. 작성한 문장을 소리 내어 크게 3번 읽어보며 귀로 직접 확인해 보세요! 🗣️⭐", "정상 문장"
 
-# --- [로그인 화면 로직] ---
-if not st.session_state.login_success:
+
+# ==========================================
+# 🔒 [구글 계정 연동] 로그인 제어 구역
+# ==========================================
+# secrets 설정 기반으로 구글 로그인 컴포넌트 호출
+user_info = login_with_google(
+    client_id=st.secrets["google_auth"]["client_id"],
+    client_secret=st.secrets["google_auth"]["client_secret"],
+    redirect_uri=st.secrets["google_auth"]["redirect_uri"],
+    cookie_secret=st.secrets["google_auth"]["cookie_secret"]
+)
+
+if not user_info:
+    # 구글 로그인이 완료되지 않은 상태
     st.markdown("""
         <div class='login-container'>
-            <h2>🎓 유사 LMS 로그인</h2>
-            <p>테스트용 이름과 역할을 선택하고 입장하세요.</p>
+            <h2>🎓 스마트 AI LMS 로그인</h2>
+            <p>안전한 데이터 보호를 위해 구글 계정 연동이 필요합니다.<br>아래 버튼을 눌러 본인 인증을 진행해 주세요.</p>
         </div>
     """, unsafe_allow_html=True)
-    
-    input_name = st.text_input("사용자 이름(이름 또는 닉네임):", value="영어꿈나무", key="login_name_input")
-    input_role = st.selectbox("당신의 역할을 선택하세요:", ["선택하세요", "🌱 학생 (Learner)", "💼 교사 (Instructor)"], key="login_role_select")
-    
-    st.write("")
-    if st.button("시스템 로그인", use_container_width=True, key="login_submit_btn"):
-        if input_role == "선택하세요" or not input_name.strip():
-            st.error("⚠️ 이름 입력과 역할 선택을 모두 완료해 주세요!")
-        else:
-            st.session_state.login_success = True
-            st.session_state.user_name = input_name
-            st.session_state.user_role = input_role
-            st.rerun()
+    st.stop() # 로그인이 안 되어 있으면 이하 코드 실행을 완전히 차단
 
-# --- [로그인 성공 후 메인 화면] ---
 else:
+    # 구글 로그인 성공 시 고유 이메일 및 사용자 이름 추출
+    user_email = user_info.get("email")
+    user_name = user_info.get("name", "사용자")
+    
+    # 해당 이메일의 역할(교사/학생)이 세션에 없다면 초기 선택 화면 제공
+    if user_email not in st.session_state.user_role_dict:
+        st.markdown(f"""
+            <div class='login-container'>
+                <h2>🌱 역할 등록 안내</h2>
+                <p><b>{user_name} ({user_email})</b>님, 반갑습니다!<br>이 계정으로 사용할 시스템 역할을 처음 한 번만 선택해 주세요.</p>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        selected_role = st.selectbox("시스템 권한을 선택하세요:", ["선택하세요", "🌱 학생 (Learner) 모드", "💼 교사 (Instructor) 모드"], key="first_role_select")
+        if st.button("역할 등록 완료", use_container_width=True):
+            if selected_role != "선택하세요":
+                st.session_state.user_role_dict[user_email] = selected_role
+                st.rerun()
+            else:
+                st.error("⚠️ 역할을 반드시 선택해야 진입할 수 있습니다.")
+        st.stop()
+
+    current_role = st.session_state.user_role_dict[user_email]
+
+    # ==========================================
+    # 🔓 본인 인증 완료 및 역할 매핑 완료 시 메인 대시보드 진입
+    # ==========================================
+    
+    # 📱 [사이드바 제어 구역]
     with st.sidebar:
-        st.markdown(f"<h3 style='text-align: center; color:#F1F5F9;'>👤 {st.session_state.user_name}님</h3>", unsafe_allow_html=True)
-        st.info(f"현재 권한: {st.session_state.user_role}")
+        st.markdown(f"<h3 style='text-align: center; color:#F1F5F9;'>👤 {user_name}님</h3>", unsafe_allow_html=True)
+        st.markdown(f"<p style='text-align: center;' class='user-profile'>{user_email}</p>", unsafe_allow_html=True)
+        st.info(f"현재 권한: {current_role}")
         st.write("---")
         
-        if "학생" in st.session_state.user_role:
+        # [학생 모드 전용] 클래스 가입 컴포넌트
+        if "학생" in current_role:
             st.markdown("### 🔑 클래스 코드 등록")
             join_code = st.text_input("선생님께 받은 코드 입력:", placeholder="예: ENG-W72B", key="join_class_input").strip()
             if st.button("클래스 등록하기", use_container_width=True):
                 if join_code in st.session_state.classes:
-                    if st.session_state.user_name not in st.session_state.classes[join_code]["students"]:
-                        st.session_state.classes[join_code]["students"].append(st.session_state.user_name)
+                    if user_email not in st.session_state.classes[join_code]["students"]:
+                        st.session_state.classes[join_code]["students"].append(user_email)
                     if join_code not in st.session_state.my_classes:
                         st.session_state.my_classes.append(join_code)
                     st.success(f"🎉 '{st.session_state.classes[join_code]['name']}' 등록 완료!")
@@ -127,22 +158,17 @@ else:
                 else:
                     st.error("⚠️ 존재하지 않는 클래스 코드입니다.")
             st.write("---")
-        
-        if st.button("🚪 로그아웃", use_container_width=True, key="logout_sidebar_btn"):
-            st.session_state.login_success = False
-            st.session_state.user_name = ""
-            st.session_state.user_role = ""
-            st.rerun()
             
         st.write("---")
-        st.markdown("<small style='color:#94A3B8;'>EduTech LMS v1.8</small>", unsafe_allow_html=True)
+        st.markdown("<small style='color:#94A3B8;'>EduTech LMS v2.0 (Google OAuth)</small>", unsafe_allow_html=True)
 
+    # 대시보드 메인 본문
     st.markdown("<h1 class='main-title'>🚀 스마트 AI 영어 글쓰기 놀이터</h1>", unsafe_allow_html=True)
-    st.markdown("<p class='sub-title'>AI의 다정한 피드백을 받고, 친구들과 공유하며 데이터로 성장하는 우리들만의 대시보드 📝🌱</p>", unsafe_allow_html=True)
+    st.markdown("<p class='sub-title'>구글 인증을 통해 동명이인 걱정 없이 안전하게 빌드업하는 포트폴리오 대시보드 📝🌱</p>", unsafe_allow_html=True)
     st.markdown("---")
 
     # ==================== [학생 화면 분기] ====================
-    if "학생" in st.session_state.user_role:
+    if "학생" in current_role:
         st.markdown("### ✍️ 학습자 전용 공간")
         
         if not st.session_state.my_classes:
@@ -153,7 +179,6 @@ else:
                 selected_class = st.selectbox("현재 가입된 클래스 선택:", st.session_state.my_classes)
                 class_info = st.session_state.classes[selected_class]
             with sc_col2:
-                # 선택한 클래스 내부에 개설된 게시판 목록만 필터링하여 선택 유도
                 selected_board = st.selectbox("제출 및 조회할 게시판 선택:", class_info["boards"])
                 
             st.caption(f"📍 소속: {class_info['name']} ({selected_class})  >  구역: {selected_board}")
@@ -164,7 +189,7 @@ else:
                 st.markdown(f"""
                     <div class='custom-card'>
                         <h4>📝 [{selected_board}] 문장 제출소</h4>
-                        <p>선택한 게시판의 목적에 맞는 영어 문장을 적어보세요. AI 튜터가 스스로 정답을 찾도록 돕습니다.</p>
+                        <p>선택한 게시판의 목적에 맞는 영어 문장을 적어보세요. AI 튜터가 피드백을 제공합니다.</p>
                     </div>
                 """, unsafe_allow_html=True)
                 
@@ -182,7 +207,7 @@ else:
                                 "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
                                 "class_code": selected_class,
                                 "board_name": selected_board,
-                                "student_id": st.session_state.user_name,
+                                "student_email": user_email,
                                 "sentence": user_input,
                                 "error_type": error_type
                             }
@@ -202,7 +227,8 @@ else:
                             post = {
                                 "class": selected_class,
                                 "board_name": selected_board,
-                                "user": st.session_state.user_name,
+                                "user_email": user_email,
+                                "user_name": user_name,
                                 "sentence": user_input,
                                 "feedback": st.session_state.current_feedback,
                                 "date": datetime.datetime.now().strftime("%m-%d %H:%M")
@@ -214,10 +240,9 @@ else:
 
             with tab2:
                 st.markdown(f"### 📋 동료 학습 게시판 [{selected_board}]")
-                st.write("현재 선택한 특정 게시판 구역에 공유된 문장들만 모아 모아서 읽어봅니다.")
+                st.write("현재 선택한 특정 게시판 구역에 공유된 문장들만 모아 읽어봅니다.")
                 st.markdown("---")
                 
-                # 클래스 부합 여부 + 세부 게시판 명칭 부합 여부 교차 검증 필터링
                 filtered_board = [p for p in st.session_state.board_data if p["class"] == selected_class and p["board_name"] == selected_board]
                 
                 if not filtered_board:
@@ -226,7 +251,7 @@ else:
                     for post in filtered_board:
                         st.markdown(f"""
                             <div class='board-card'>
-                                <div class='board-user'>👤 {post['user']} <span class='board-tag'>{post['board_name']}</span> <span style='color: #94A3B8; font-size: 12px; font-weight: normal; float: right;'>{post['date']}</span></div>
+                                <div class='board-user'>👤 {post['user_name']} <span style='font-size:11px; color:#94A3B8;'>({post['user_email']})</span> <span class='board-tag'>{post['board_name']}</span> <span style='color: #94A3B8; font-size: 12px; font-weight: normal; float: right;'>{post['date']}</span></div>
                                 <div class='board-sentence'><b>✍️ 작성 문장:</b> {post['sentence']}</div>
                                 <div class='board-feedback'><b>💡 받은 AI 피드백:</b> {post['feedback']}</div>
                             </div>
@@ -245,10 +270,10 @@ else:
             if st.button("🛠️ 클래스 생성 및 코드 발급"):
                 if new_class_name.strip():
                     random_code = "ENG-" + "".join(random.choices(string.ascii_uppercase + string.digits, k=4))
-                    # 클래스 신규 생성 시 기본 자유게시판을 1개 기본 세팅해 줌
                     st.session_state.classes[random_code] = {
                         "name": new_class_name, 
-                        "teacher": st.session_state.user_name, 
+                        "teacher_email": user_email, 
+                        "teacher_name": user_name,
                         "students": [],
                         "boards": ["📢 공지사항 및 자유게시판"]
                     }
